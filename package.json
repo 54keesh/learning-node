@@ -1,0 +1,10 @@
+{
+  "name": "learning-nodejs",
+  "type": "module",
+  "dependencies": {
+    "typescript": "^7.0.2"
+  },
+  "scripts": {
+    "build": "tsc"
+  }
+}
