@@ -1,12 +1,17 @@
 {
   "compilerOptions": {
-    "target": "es2023",
+    "target": "ESNext",
     "module": "esnext",
     "strict": true,
-    "rootDir": "./",
-    "outDir": "./dist",
-    "noEmit": false,
-    "rewriteRelativeImportExtensions": true,
-    "allowImportingTsExtensions": true
-  }
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "types": [
+      "node"
+    ],
+    "jsx": "react-jsx",
+    "jsxImportSource": "hono/jsx",
+    "rootDir": "./src",
+    "outDir": "./dist"
+  },
+  "exclude": ["node_modules", "drizzle.config.ts", "drizzle"]
 }

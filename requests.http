@@ -1,0 +1,32 @@
+### Variables
+@baseUrl = http://localhost:3000
+
+### Create a todo
+# @name create
+POST {{baseUrl}}/todos
+Content-Type: application/json
+
+{
+  "title": "Buy milk"
+}
+
+### List all todos
+GET {{baseUrl}}/todos
+
+### Get one todo (uses id returned by the create request above)
+GET {{baseUrl}}/todos/{{create.response.body.id}}
+
+### Update a todo
+PUT {{baseUrl}}/todos/{{create.response.body.id}}
+Content-Type: application/json
+
+{
+  "title": "Buy oat milk",
+  "done": true
+}
+
+### Delete a todo
+DELETE {{baseUrl}}/todos/{{create.response.body.id}}
+
+### Get a todo that doesn't exist -> 404
+GET {{baseUrl}}/todos/00000000-0000-0000-0000-000000000000

@@ -1,10 +1,23 @@
 {
-  "name": "learning-nodejs",
+  "name": "my-app",
   "type": "module",
-  "dependencies": {
-    "typescript": "^7.0.2"
-  },
   "scripts": {
-    "build": "tsc"
+    "dev": "tsx watch --env-file=.env src/server.ts",
+    "build": "tsc",
+    "start": "node --env-file=.env dist/server.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.0",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.13.1",
+    "postgres": "^3.4.9"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.23.0",
+    "typescript": "^7.0.2"
   }
 }
