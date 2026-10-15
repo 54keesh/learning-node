@@ -34,12 +34,14 @@ RUN npm ci
 # ---------------------------------------------------------------------------
 FROM deps AS dev
 
+COPY . .
+
 # an open port means an application is listening on that port —
 # opportunities for malicious actors to attack the application, so only
 # expose what's actually needed.
 EXPOSE 3000
 
-CMD ["npx", "tsx", "watch", "--env-file=.env", "src/server.ts"]
+CMD ["npx", "tsx", "watch", "src/server.ts"]
 
 # ---------------------------------------------------------------------------
 # Stage: "builder" — compiles the app for production.

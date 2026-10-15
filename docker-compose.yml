@@ -1,0 +1,71 @@
+# Docker compose is not a replacement for dockerfile, 
+# but a way to orchestrate multiple containers and networks. 
+# It is a tool for defining and running multi-container Docker applications
+
+# docker-compose.yml
+#
+# Automates exactly the two `docker run` commands + `docker network create`
+# we were doing by hand: one service for Postgres, one for the app, both on
+# a shared network that Compose creates automatically. Run with:
+#
+#   docker compose up --build
+#
+# and tear down with:
+#
+#   docker compose down          # stops + removes containers and network
+#   docker compose down -v       # also deletes the db's data volume
+#
+services:
+  db:
+    # by default repository is hub.docker.com, and the tag is "latest" if not specified.
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: kashif
+      POSTGRES_PASSWORD: kashif
+      POSTGRES_DB: honojs
+    ports:
+      # host:container — lets you connect from the host (e.g. to run
+      # drizzle-kit migrate from your machine, or inspect with psql/a GUI).
+      - "6432:5432"
+    volumes:
+      # Named volume: Postgres writes its actual data files here. Without
+      # this, `docker compose down` (which removes the container) would
+      # wipe every row along with it — the volume is what makes the data
+      # outlive the container. Survives `down`, only wiped by `down -v`.
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kashif -d honojs"]
+      # interval is how often to run the test command
+      interval: 3s
+      # timeout is how long to wait for the command to succeed before considering it a failure
+      timeout: 3s
+      retries: 10
+
+  app:
+    build:
+      # where to find the docker file
+      context: .
+      # by default docker-compose looks for a file named "Dockerfile"
+      dockerfile: Dockerfile
+      target: dev   # picks the "dev" stage (tsx watch) out of the multistage Dockerfile
+    environment:
+      # "db" here is the *service name* above — Compose puts every service
+      # on the same network automatically and lets them resolve each other
+      # by service name, same idea as --network + container name did manually.
+      DATABASE_URL: postgres://kashif:kashif@db:5432/honojs
+    ports:
+      - "3000:3000"
+    # interservices dependencies
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # Bind mount: maps this host folder into /app inside the container.
+      # Edit a file on your host and the running container sees it
+      # immediately — this is what makes live reload (tsx watch) possible.
+      - .:/app
+
+volumes:
+  # named volume
+  db-data: 
+    
