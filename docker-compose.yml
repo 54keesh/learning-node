@@ -20,9 +20,9 @@ services:
     # by default repository is hub.docker.com, and the tag is "latest" if not specified.
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: kashif
-      POSTGRES_PASSWORD: kashif
-      POSTGRES_DB: honojs
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       # host:container — lets you connect from the host (e.g. to run
       # drizzle-kit migrate from your machine, or inspect with psql/a GUI).
@@ -34,7 +34,7 @@ services:
       # outlive the container. Survives `down`, only wiped by `down -v`.
       - db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kashif -d honojs"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       # interval is how often to run the test command
       interval: 3s
       # timeout is how long to wait for the command to succeed before considering it a failure
@@ -52,7 +52,7 @@ services:
       # "db" here is the *service name* above — Compose puts every service
       # on the same network automatically and lets them resolve each other
       # by service name, same idea as --network + container name did manually.
-      DATABASE_URL: postgres://kashif:kashif@db:5432/honojs
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     ports:
       - "3000:3000"
     # interservices dependencies
