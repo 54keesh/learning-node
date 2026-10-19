@@ -14,7 +14,7 @@
 #
 #   docker compose down          # stops + removes containers and network
 #   docker compose down -v       # also deletes the db's data volume
-#
+# 
 services:
   db:
     # by default repository is hub.docker.com, and the tag is "latest" if not specified.
@@ -42,12 +42,18 @@ services:
       retries: 10
 
   app:
+    # Pulled from GitHub Container Registry by CI (see .github/workflows/deploy.yml)
+    # instead of built locally, so the server runs the exact image CI built and
+    # tested. IMAGE defaults to :latest for local `docker compose up --build`,
+    # where build: below is used instead (image: + build: can coexist — compose
+    # builds and tags it as IMAGE when you pass --build, otherwise it pulls).
+    image: ${IMAGE:-ghcr.io/54keesh/learning-node:latest}
     build:
       # where to find the docker file
       context: .
       # by default docker-compose looks for a file named "Dockerfile"
       dockerfile: Dockerfile
-      target: dev   # picks the "dev" stage (tsx watch) out of the multistage Dockerfile
+      target: runner   # picks the "runner" stage (compiled, production) out of the multistage Dockerfile
     environment:
       # "db" here is the *service name* above — Compose puts every service
       # on the same network automatically and lets them resolve each other
@@ -59,11 +65,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    volumes:
-      # Bind mount: maps this host folder into /app inside the container.
-      # Edit a file on your host and the running container sees it
-      # immediately — this is what makes live reload (tsx watch) possible.
-      - .:/app
+    restart: unless-stopped
 
 volumes:
   # named volume
