@@ -1,22 +1,24 @@
 name: Build and deploy
 
 # Required repo secrets (Settings > Secrets and variables > Actions):
-#   EC2_HOST     - server's public IP or hostname
-#   EC2_USER     - ssh user (e.g. ubuntu)
-#   EC2_SSH_KEY  - private key matching a public key in the server's ~/.ssh/authorized_keys
+#   EC2_HOST          - server's public IP or hostname
+#   EC2_USER           - ssh user (e.g. ubuntu)
+#   EC2_SSH_KEY        - private key matching a public key in the server's ~/.ssh/authorized_keys
+#   POSTGRES_USER      - written into the server's .env on every deploy
+#   POSTGRES_PASSWORD  - written into the server's .env on every deploy
+#   POSTGRES_DB        - written into the server's .env on every deploy
 #
 # Repo is public, so the ghcr.io image is public too (same visibility as the
 # repo on first push) - no registry login needed on the server to pull it.
 # If the repo/package visibility ever changes to private, add a GHCR_TOKEN
 # secret (PAT, read:packages scope) and `docker login ghcr.io` before pulling.
-#
-# One-time server setup (run once, by hand, before the first deploy):
-#   mkdir -p ~/learning-node
-#   put a .env file in ~/learning-node with POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB
 
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "**.md"
+      - ".gitignore"
 
 env:
   IMAGE: ghcr.io/${{ github.repository }}
@@ -28,17 +30,18 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      # action means reusable scripts
+      - uses: actions/checkout@v4 # clones the code on ci server
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v3 # sets up docker buildx for building multi-platform images
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v3 # logs into docker registry (ghcr.io) using github token, so that the image can be pushed to ghcr.io
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v6 # builds and pushes the docker image to ghcr.io
         with:
           context: .
           target: runner
@@ -51,30 +54,62 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4 # clones the code on ci server
 
-      - name: Copy compose file to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "docker-compose.yml"
-          target: "~/learning-node"
-
-      - name: Pull new image and restart
+      - name: Ensure deploy directory exists
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          # .env on the server holds POSTGRES_*; IMAGE is set inline per
-          # deploy instead of being written into .env, so it never leaks
-          # into local `docker compose up --build` runs.
-          envs: IMAGE
+          script: mkdir -p ~/deployments/learning-node
+
+      - name: Copy compose file to server
+        uses: appleboy/scp-action@v0.1.7 # copies files to a remote server over ssh(secure copy - scp)
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "docker-compose.yml"
+          target: "~/deployments/learning-node"
+
+      - name: Write .env on server
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB
           script: |
-            cd ~/learning-node
-            export IMAGE="${IMAGE}:${{ github.sha }}"
+            cd ~/deployments/learning-node
+            cat > .env <<EOF
+            POSTGRES_USER=${POSTGRES_USER}
+            POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+            POSTGRES_DB=${POSTGRES_DB}
+            EOF
+            chmod 600 .env
+
+      - name: Pull new image and restart
+        uses: appleboy/ssh-action@v1.2.0 # runs commands on a remote server over ssh
+        env:
+          ACTIONS_IMAGE: ${{ env.IMAGE }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          # .env on the server holds POSTGRES_* (written by the previous step);
+          # IMAGE is set inline per deploy instead, so it never leaks into
+          # local `docker compose up --build` runs. Piped in under a
+          # distinct name (ACTIONS_IMAGE) so it can't collide with IMAGE,
+          # which docker-compose.yml substitutes for itself on the server.
+          envs: ACTIONS_IMAGE
+          script: |
+            cd ~/deployments/learning-node
+            export IMAGE="${ACTIONS_IMAGE}:${{ github.sha }}"
             docker compose pull app
             docker compose up -d
             docker image prune -f
